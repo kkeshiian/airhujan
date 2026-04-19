@@ -1,541 +1,434 @@
-<x-layouts.app :title="'Dashboard Monitoring'" :heading="'Dashboard Monitoring'">
-    <!-- Row atas: Card Alat 1 & Alat 2 -->
-    <section class="grid gap-4 lg:grid-cols-2">
-        <article class="rounded-2xl bg-gradient-to-br from-sky-50 via-cyan-50 to-blue-100 p-5 shadow-sm ring-1 ring-cyan-200">
-            <div class="mb-4 flex items-start justify-between gap-3">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">ALAT 1</p>
-                    <h3 class="mt-1 font-semibold text-ink">Curah Hujan & Tinggi Air</h3>
-                </div>
-                <svg class="h-6 w-6 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3v-9"></path></svg>
-            </div>
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p id="alat1RuntimeBadge" class="inline-flex rounded-full bg-cyan-100 px-2.5 py-1 text-[11px] font-medium text-cyan-800 ring-1 ring-cyan-200">
-                    {{ $alat1RuntimeStatus }}
+<x-layouts.app :title="'Dashboard IoT Curah Hujan'" :heading="'Dashboard IoT Curah Hujan'" :subheading="'Monitoring realtime, kontrol command, dan konfigurasi ESP32 via MQTT.'">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Status Hujan</p>
+            <div class="mt-3 flex items-center gap-2">
+                <span id="rainStatusDot" class="inline-block h-3 w-3 rounded-full {{ ($latestAlat1?->is_raining ?? false) ? 'bg-red-500' : 'bg-emerald-500' }}"></span>
+                <p id="rainStatusText" class="text-lg font-semibold {{ ($latestAlat1?->is_raining ?? false) ? 'text-red-700' : 'text-emerald-700' }}">
+                    {{ ($latestAlat1?->is_raining ?? false) ? 'HUJAN' : 'TIDAK HUJAN' }}
                 </p>
-                <p id="rainStatusBadge" class="inline-flex rounded-full px-3 py-1 text-sm font-semibold {{ $latestRainStatus === 'Rain' ? 'bg-cyan-100 text-cyan-800' : 'bg-slate-100 text-slate-700' }}">Status: {{ $latestRainStatus }}</p>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-xl bg-white/80 p-3 ring-1 ring-cyan-100">
-                    <p class="text-xs text-slate-600">Curah Hujan</p>
-                    <p class="mt-2 text-2xl font-bold text-cyan-700"><span id="currentRainfallValue">{{ number_format($latestAlat1?->rainfall_mm ?? 0, 1) }}</span> <span class="text-sm">mm</span></p>
-                </div>
-                <div class="rounded-xl bg-white/80 p-3 ring-1 ring-blue-100">
-                    <p class="text-xs text-slate-600">Jarak Air</p>
-                    <p class="mt-2 text-2xl font-bold text-cyan-700"><span id="jarakAirValue">{{ number_format($latestAlat1?->water_level_cm ?? 0, 1) }}</span> <span class="text-sm">cm</span></p>
-                </div>
+        </article>
+
+        <article class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Curah Hujan Hari Ini</p>
+            <p class="mt-3 text-3xl font-bold text-cyan-700"><span id="dailyRainMmValue">{{ number_format($latestAlat1?->rainfall_mm ?? 0, 2) }}</span> <span class="text-sm">mm</span></p>
+        </article>
+
+        <article class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+            <p class="text-xs uppercase tracking-[0.15em] text-slate-500">Tinggi Air</p>
+            <p class="mt-3 text-3xl font-bold text-indigo-700"><span id="waterLevelValue">{{ number_format($latestAlat1?->water_level_cm ?? 0, 0) }}</span> <span class="text-sm">cm</span></p>
+        </article>
+    </section>
+
+    <section class="mt-5 grid gap-4 lg:grid-cols-2">
+        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="font-semibold text-ink">Grafik Curah Hujan</h3>
+                <select id="rainChartView" class="rounded-lg border border-slate-300 px-2 py-1 text-xs">
+                    <option value="24">24 titik terakhir</option>
+                    <option value="12">12 titik terakhir</option>
+                    <option value="6">6 titik terakhir</option>
+                </select>
+            </div>
+            <div class="h-[260px]">
+                <canvas id="rainChart"></canvas>
             </div>
         </article>
 
         <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <div class="mb-3 flex items-start justify-between gap-3">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-500">ALAT 2</p>
-                    <h3 class="mt-1 font-semibold text-ink">Perekam Suara</h3>
-                </div>
-                <svg class="h-6 w-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4"></path></svg>
+            <div class="mb-3 flex items-center justify-between">
+                <h3 class="font-semibold text-ink">Grafik Tinggi Air</h3>
+                <select id="waterChartView" class="rounded-lg border border-slate-300 px-2 py-1 text-xs">
+                    <option value="24">24 titik terakhir</option>
+                    <option value="12">12 titik terakhir</option>
+                    <option value="6">6 titik terakhir</option>
+                </select>
             </div>
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p id="alat2RuntimeBadge" class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-medium text-sky-800 ring-1 ring-sky-200">
-                    {{ $alat2RuntimeStatus }}
-                </p>
-                <a href="{{ route('audio.index') }}" class="inline-block rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
-                    Lihat Rekaman
-                </a>
-            </div>
-            <div class="rounded-xl bg-sky-50 p-3">
-                <p class="text-xs text-slate-600">Status</p>
-                <p id="alat2StatusText" class="mt-2 text-lg font-semibold text-sky-700">Siap Merekam</p>
+            <div class="h-[260px]">
+                <canvas id="waterChart"></canvas>
             </div>
         </article>
     </section>
 
-    <!-- Row bawah: 3 chart bersampingan -->
-    <section class="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <div class="grid gap-3 lg:grid-cols-3">
-            <section class="rounded-xl bg-sky-50/70 p-2.5 ring-1 ring-sky-100">
-                <p class="mb-1 text-xs font-semibold text-sky-800">Curah Hujan (mm)</p>
-                <div class="h-[190px] w-full">
-                    <canvas id="rainfallBarChart"></canvas>
-                </div>
-            </section>
-            <section class="rounded-xl bg-blue-50/70 p-2.5 ring-1 ring-blue-100">
-                <p class="mb-1 text-xs font-semibold text-blue-800">Jarak Air (cm)</p>
-                <div class="h-[190px] w-full">
-                    <canvas id="waterLevelBarChart"></canvas>
-                </div>
-            </section>
-            <section class="rounded-xl bg-cyan-50/70 p-2.5 ring-1 ring-cyan-100">
-                <p class="mb-1 text-xs font-semibold text-cyan-800">Frekuensi Rekaman Audio</p>
-                <div class="h-[190px] w-full">
-                    <canvas id="audioFrequencyChart"></canvas>
-                </div>
-            </section>
+    <section class="mt-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-semibold text-ink">Telemetri ESP32 Realtime</h3>
+            <span id="lastDataInBadge" class="inline-flex rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200">Terakhir data masuk: - WITA</span>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Mode ESP</p>
+                <p id="telemetryEspMode" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Boot Type</p>
+                <p id="telemetryBootType" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Wake Reason</p>
+                <p id="telemetryWakeReason" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Current State</p>
+                <p id="telemetryCurrentState" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Deep Sleep Reason</p>
+                <p id="telemetryDeepSleepReason" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Status Hujan Firmware</p>
+                <p id="telemetryIsRain" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">WiFi State</p>
+                <p id="telemetryWifiState" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Relay State</p>
+                <p id="telemetryRelayState" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Startup Window</p>
+                <p id="telemetryStartupWindow" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">Startup With WiFi</p>
+                <p id="telemetryStartupWithWifi" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">WiFi Mode Started</p>
+                <p id="telemetryWifiModeStarted" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-3">
+                <p class="text-xs text-slate-500">WiFi Ready</p>
+                <p id="telemetryWifiReady" class="mt-1 text-sm font-semibold text-slate-900">-</p>
+            </div>
         </div>
     </section>
 
-    <!-- Ringkasan daya + chart daya -->
-    <section class="mt-6 grid gap-5 lg:grid-cols-[1fr_1.2fr]">
-        <article class="rounded-2xl bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-100 p-5 shadow-sm ring-1 ring-blue-200">
-            <div class="flex flex-col gap-5">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="rounded-xl bg-white/75 p-3 ring-1 ring-sky-100">
-                        <div class="mb-2 flex items-center gap-2">
-                            <svg class="h-5 w-5 text-sky-600" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2"/><line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2"/><line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2"/></svg>
-                            <p class="text-xs font-semibold uppercase tracking-[0.05em] text-sky-700">Solar Panel</p>
-                        </div>
-                        <p class="text-2xl font-bold text-sky-700"><span id="latestSolarValue">{{ $latestSolar }}</span> <span class="text-sm">W</span></p>
-                        <p class="mt-1 text-xs text-slate-600">Daya input saat ini</p>
-                    </div>
-                    <div class="rounded-xl bg-white/75 p-3 ring-1 ring-blue-100">
-                        <div class="mb-2 flex items-center gap-2">
-                            <svg class="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="1" stroke="currentColor" stroke-width="2" fill="none"/><rect x="22" y="11" width="2" height="2" fill="currentColor"/></svg>
-                            <p class="text-xs font-semibold uppercase tracking-[0.05em] text-blue-700">Baterai</p>
-                        </div>
-                        <p class="text-2xl font-bold text-blue-700"><span id="latestBatteryValue">{{ $latestBattery }}</span> <span class="text-sm">%</span></p>
-                        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-300">
-                            <div id="batteryLevelBar" class="h-full rounded-full transition-all {{ $latestBattery >= 75 ? 'bg-sky-500' : ($latestBattery >= 50 ? 'bg-cyan-500' : ($latestBattery >= 25 ? 'bg-blue-500' : 'bg-red-500')) }}" style="width: {{ $latestBattery }}%"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="rounded-xl bg-white/75 p-3 ring-1 ring-slate-200">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <p class="text-xs uppercase tracking-[0.08em] text-slate-500">Relay WiFi</p>
-                            <p id="relayMqttStatus" class="mt-1 inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-200">
-                                Menunggu status MQTT
-                            </p>
-                        </div>
-                        <label class="inline-flex cursor-pointer items-center gap-2">
-                            <span class="text-xs font-semibold text-blue-700">OFF</span>
-                            <span class="relative inline-flex items-center">
-                                <input type="checkbox" class="peer sr-only" aria-label="Toggle relay wifi">
-                                <span class="h-7 w-12 rounded-full bg-blue-200 transition peer-checked:bg-blue-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300"></span>
-                                <span class="pointer-events-none absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow transition-all peer-checked:left-6"></span>
-                            </span>
-                            <span class="text-xs font-semibold text-blue-700">ON</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </article>
-
-        <article class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <h3 class="font-semibold text-ink">Daya Solar & Baterai</h3>
-            </div>
-            <div class="h-[260px] w-full md:h-[290px]">
-                <canvas id="powerChart"></canvas>
-            </div>
-        </article>
-    </section>
-
-    <!-- Lokasi Perangkat -->
-    <section class="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div class="mb-4 flex items-start justify-between gap-3">
-            <div>
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Lokasi Perangkat</p>
-                <h3 class="mt-1 font-semibold text-ink">Peta Lokasi Alat Monitoring</h3>
-            </div>
-            <svg class="h-6 w-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+    <section class="mt-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="font-semibold text-ink">Configuration Panel ESP32</h3>
+            <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200">Mode normal: deep sleep | Mode debug: selalu aktif</span>
         </div>
-        <div id="locationMap" class="h-[230px] w-full rounded-xl ring-1 ring-slate-200 sm:h-[270px]"></div>
-        <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            @foreach($locations as $location)
-                <div class="rounded-lg bg-slate-50 p-2.5">
-                    <p class="text-xs font-semibold uppercase text-slate-700">{{ $location->device_code }}</p>
-                    <p class="truncate text-xs text-slate-600">{{ $location->device_name }}</p>
-                </div>
-            @endforeach
-        </div>
+
+        <form id="deviceConfigForm" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">sleep_minutes</span>
+                <input type="number" min="1" max="1440" step="1" name="sleep_minutes" value="{{ (int) $deviceSetting->sleep_minutes }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">awake_minutes</span>
+                <input type="number" min="1" max="240" step="1" name="awake_minutes" value="{{ (int) $deviceSetting->awake_minutes }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">rain_tip_threshold</span>
+                <input type="number" min="1" max="200" step="1" name="rain_tip_threshold" value="{{ (int) $deviceSetting->rain_tip_threshold }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">rain_stop_timeout_ms</span>
+                <input type="number" min="1000" max="1800000" step="100" name="rain_stop_timeout_ms" value="{{ (int) $deviceSetting->rain_stop_timeout_ms }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">wifi_warmup_ms</span>
+                <input type="number" min="100" step="100" name="wifi_warmup_ms" value="{{ (int) $deviceSetting->wifi_warmup_ms }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">mm_per_tip</span>
+                <input type="number" min="0.01" max="20" step="0.001" name="mm_per_tip" value="{{ number_format((float) $deviceSetting->mm_per_tip, 3, '.', '') }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">baseline_cm</span>
+                <input type="number" min="0" max="1000" step="0.01" name="baseline_cm" value="{{ number_format((float) $deviceSetting->baseline_cm, 2, '.', '') }}" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">esp_mode</span>
+                <select name="esp_mode" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                    <option value="0" @selected((int) $deviceSetting->esp_mode === 0)>0 - NORMAL</option>
+                    <option value="1" @selected((int) $deviceSetting->esp_mode === 1)>1 - DEBUG</option>
+                </select>
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">force_rain</span>
+                <select name="force_rain" class="w-full rounded-xl border border-slate-300 px-3 py-2">
+                    <option value="0" @selected(!$deviceSetting->force_rain)>false</option>
+                    <option value="1" @selected($deviceSetting->force_rain)>true</option>
+                </select>
+            </label>
+
+            <div class="flex items-end">
+                <button type="submit" class="w-full rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900">Simpan & Publish Config</button>
+            </div>
+        </form>
+
+        <p id="configStatus" class="mt-3 text-xs text-slate-500">Konfigurasi siap dikirim.</p>
     </section>
 
     @push('head')
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="https://unpkg.com/mqtt@5.10.3/dist/mqtt.min.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     @endpush
 
     @push('scripts')
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
         <script>
-            // Map
-            @php
-                $mapPoints = $locations->map(function ($item) {
-                    return [
-                        'name' => $item->device_name,
-                        'code' => strtoupper($item->device_code),
-                        'lat' => $item->latitude,
-                        'lng' => $item->longitude,
-                    ];
-                })->values();
-            @endphp
+            const mqttConfig = @json($mqtt);
+            const dashboardLiveEndpoint = @json(route('dashboard.live'));
+            const dashboardChartEndpoint = @json(route('dashboard.chart-data'));
+            const dashboardConfigEndpoint = @json(route('dashboard.config'));
+            const csrfToken = @json(csrf_token());
 
-            const points = @json($mapPoints);
-            const defaultPoint = points[0] || { lat: -6.2, lng: 106.8 };
-            const locationMap = L.map('locationMap', {
-                zoomControl: true,
-                scrollWheelZoom: false,
-            }).setView([defaultPoint.lat, defaultPoint.lng], 12);
+            const rainStatusDotEl = document.getElementById('rainStatusDot');
+            const rainStatusTextEl = document.getElementById('rainStatusText');
+            const dailyRainMmValueEl = document.getElementById('dailyRainMmValue');
+            const waterLevelValueEl = document.getElementById('waterLevelValue');
+            const configStatusEl = document.getElementById('configStatus');
+            const deviceConfigFormEl = document.getElementById('deviceConfigForm');
+            const rainChartViewEl = document.getElementById('rainChartView');
+            const waterChartViewEl = document.getElementById('waterChartView');
+            const telemetryEspModeEl = document.getElementById('telemetryEspMode');
+            const telemetryBootTypeEl = document.getElementById('telemetryBootType');
+            const telemetryWakeReasonEl = document.getElementById('telemetryWakeReason');
+            const telemetryCurrentStateEl = document.getElementById('telemetryCurrentState');
+            const telemetryDeepSleepReasonEl = document.getElementById('telemetryDeepSleepReason');
+            const telemetryIsRainEl = document.getElementById('telemetryIsRain');
+            const telemetryWifiStateEl = document.getElementById('telemetryWifiState');
+            const telemetryRelayStateEl = document.getElementById('telemetryRelayState');
+            const telemetryStartupWindowEl = document.getElementById('telemetryStartupWindow');
+            const telemetryStartupWithWifiEl = document.getElementById('telemetryStartupWithWifi');
+            const telemetryWifiModeStartedEl = document.getElementById('telemetryWifiModeStarted');
+            const telemetryWifiReadyEl = document.getElementById('telemetryWifiReady');
+            const lastDataInBadgeEl = document.getElementById('lastDataInBadge');
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(locationMap);
+            let chartLabels = @json($chartLabels);
+            let rainfallData = @json($rainfallData);
+            let waterLevelData = @json($waterLevelData);
 
-            const bounds = [];
-
-            points.forEach((point) => {
-                L.marker([point.lat, point.lng])
-                    .addTo(locationMap)
-                    .bindPopup(`<strong>${point.code}</strong><br>${point.name}`);
-
-                bounds.push([point.lat, point.lng]);
-            });
-
-            if (bounds.length > 1) {
-                locationMap.fitBounds(bounds, { padding: [24, 24] });
+            function asNumber(value, fallback = 0) {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? parsed : fallback;
             }
 
-            // Resize map on window resize
-            window.addEventListener('resize', () => {
-                setTimeout(() => locationMap.invalidateSize(), 250);
-            });
+            function asBool(value) {
+                if (typeof value === 'boolean') {
+                    return value;
+                }
 
-            // Main bar charts
-            const labels = @json($chartLabels);
-            const dashboardLiveEndpoint = @json(route('dashboard.live'));
-            const chartDataEndpoint = @json(route('dashboard.chart-data'));
-            const rainfallCtx = document.getElementById('rainfallBarChart').getContext('2d');
-            const rainfallBarChart = new Chart(rainfallCtx, {
+                if (typeof value === 'number') {
+                    return value === 1;
+                }
+
+                if (typeof value === 'string') {
+                    const normalized = value.trim().toLowerCase();
+                    return ['1', 'true', 'yes', 'on'].includes(normalized);
+                }
+
+                return false;
+            }
+
+            function updateRainBadge(isRaining) {
+                if (!rainStatusTextEl || !rainStatusDotEl) {
+                    return;
+                }
+
+                rainStatusTextEl.textContent = isRaining ? 'HUJAN' : 'TIDAK HUJAN';
+                rainStatusTextEl.classList.remove('text-red-700', 'text-emerald-700');
+                rainStatusDotEl.classList.remove('bg-red-500', 'bg-emerald-500');
+
+                if (isRaining) {
+                    rainStatusTextEl.classList.add('text-red-700');
+                    rainStatusDotEl.classList.add('bg-red-500');
+                } else {
+                    rainStatusTextEl.classList.add('text-emerald-700');
+                    rainStatusDotEl.classList.add('bg-emerald-500');
+                }
+            }
+
+            function updateStatusFields(payload) {
+                const isRaining = asBool(payload.latest_is_raining ?? payload.is_raining);
+
+                updateRainBadge(isRaining);
+
+                if (dailyRainMmValueEl) {
+                    dailyRainMmValueEl.textContent = asNumber(payload.latest_rainfall_mm ?? payload.daily_rain_mm).toFixed(2);
+                }
+
+                if (waterLevelValueEl) {
+                    waterLevelValueEl.textContent = String(Math.round(asNumber(payload.latest_water_level_cm ?? payload.jarak_air_cm)));
+                }
+
+                updateTelemetryFields(payload);
+            }
+
+            function asLabel(value, fallback = '-') {
+                if (value === null || value === undefined) {
+                    return fallback;
+                }
+
+                const text = String(value).trim();
+                return text === '' ? fallback : text;
+            }
+
+            function asOnOffLabel(value) {
+                return asBool(value) ? 'ON / TRUE' : 'OFF / FALSE';
+            }
+
+            function formatWitaTime(dateValue) {
+                return new Intl.DateTimeFormat('id-ID', {
+                    timeZone: 'Asia/Makassar',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                }).format(dateValue);
+            }
+
+            function updateLastDataBadge(dateValue = new Date()) {
+                if (!lastDataInBadgeEl) {
+                    return;
+                }
+
+                lastDataInBadgeEl.textContent = `Terakhir data masuk: ${formatWitaTime(dateValue)} WITA`;
+            }
+
+            function hasValue(value) {
+                return value !== null && value !== undefined && String(value).trim() !== '';
+            }
+
+            function updateTelemetryFields(payload) {
+                if (telemetryEspModeEl && (hasValue(payload.esp_mode_name) || hasValue(payload.latest_esp_mode_name) || hasValue(payload.esp_mode) || hasValue(payload.latest_esp_mode))) {
+                    telemetryEspModeEl.textContent = asLabel(payload.esp_mode_name ?? payload.latest_esp_mode_name, asNumber(payload.esp_mode ?? payload.latest_esp_mode) === 1 ? 'DEBUG' : 'NORMAL').toUpperCase();
+                }
+
+                if (telemetryBootTypeEl && hasValue(payload.boot_type)) {
+                    telemetryBootTypeEl.textContent = asLabel(payload.boot_type);
+                }
+
+                if (telemetryWakeReasonEl && hasValue(payload.wake_reason)) {
+                    telemetryWakeReasonEl.textContent = asLabel(payload.wake_reason);
+                }
+
+                if (telemetryCurrentStateEl && (hasValue(payload.current_state) || hasValue(payload.device_position))) {
+                    telemetryCurrentStateEl.textContent = asLabel(payload.current_state ?? payload.device_position);
+                }
+
+                if (telemetryDeepSleepReasonEl && hasValue(payload.deep_sleep_reason)) {
+                    telemetryDeepSleepReasonEl.textContent = asLabel(payload.deep_sleep_reason);
+                }
+
+                if (telemetryIsRainEl && (hasValue(payload.is_rain) || hasValue(payload.is_raining) || hasValue(payload.latest_is_raining))) {
+                    telemetryIsRainEl.textContent = asLabel(payload.is_rain, asBool(payload.is_raining ?? payload.latest_is_raining) ? 'RAIN' : 'NO_RAIN').toUpperCase();
+                }
+
+                if (telemetryWifiStateEl && hasValue(payload.wifi_state)) {
+                    telemetryWifiStateEl.textContent = asLabel(payload.wifi_state);
+                }
+
+                if (telemetryRelayStateEl && hasValue(payload.relay_state)) {
+                    telemetryRelayStateEl.textContent = asLabel(payload.relay_state).toUpperCase();
+                }
+
+                if (telemetryStartupWindowEl && hasValue(payload.startup_window_active)) {
+                    telemetryStartupWindowEl.textContent = asOnOffLabel(payload.startup_window_active);
+                }
+
+                if (telemetryStartupWithWifiEl && hasValue(payload.startup_with_wifi)) {
+                    telemetryStartupWithWifiEl.textContent = asOnOffLabel(payload.startup_with_wifi);
+                }
+
+                if (telemetryWifiModeStartedEl && hasValue(payload.wifi_mode_started)) {
+                    telemetryWifiModeStartedEl.textContent = asOnOffLabel(payload.wifi_mode_started);
+                }
+
+                if (telemetryWifiReadyEl && hasValue(payload.wifi_ready_to_connect)) {
+                    telemetryWifiReadyEl.textContent = asOnOffLabel(payload.wifi_ready_to_connect);
+                }
+            }
+
+            function chartSlice(data, limit) {
+                const safeLimit = Math.max(1, Number(limit) || 24);
+                return data.slice(-safeLimit);
+            }
+
+            const rainChart = new Chart(document.getElementById('rainChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: chartSlice(chartLabels, 24),
                     datasets: [{
                         label: 'Curah Hujan (mm)',
-                        data: @json($rainfallData),
-                        borderColor: '#0284c7',
-                        backgroundColor: 'rgba(14, 165, 233, 0.72)',
-                        borderRadius: 6,
-                        maxBarThickness: 22
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            ticks: { color: '#0ea5e9' },
-                            grid: { color: 'rgba(148, 163, 184, 0.2)' }
-                        },
-                        x: {
-                            ticks: { maxTicksLimit: 8, color: '#64748b' },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-
-            const waterLevelCtx = document.getElementById('waterLevelBarChart').getContext('2d');
-            const waterLevelBarChart = new Chart(waterLevelCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Jarak Air (cm)',
-                        data: @json($waterLevelData),
-                        borderColor: '#1d4ed8',
-                        backgroundColor: 'rgba(37, 99, 235, 0.72)',
-                        borderRadius: 6,
-                        maxBarThickness: 22
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            ticks: { color: '#2563eb' },
-                            grid: { color: 'rgba(148, 163, 184, 0.2)' }
-                        },
-                        x: {
-                            ticks: { maxTicksLimit: 8, color: '#64748b' },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-
-            const audioFrequencyCtx = document.getElementById('audioFrequencyChart').getContext('2d');
-            const audioFrequencyChart = new Chart(audioFrequencyCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Frekuensi Rekaman',
-                        data: @json($audioFrequencyData),
+                        data: chartSlice(rainfallData, 24),
                         borderColor: '#0891b2',
-                        backgroundColor: 'rgba(6, 182, 212, 0.72)',
-                        borderRadius: 6,
-                        maxBarThickness: 22
-                    }]
+                        backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                        borderWidth: 2,
+                        borderRadius: 5,
+                        maxBarThickness: 28,
+                    }],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { precision: 0, color: '#0e7490' },
-                            grid: { color: 'rgba(148, 163, 184, 0.2)' }
-                        },
                         x: {
-                            ticks: { maxTicksLimit: 8, color: '#64748b' },
-                            grid: { display: false }
-                        }
-                    }
-                }
+                            ticks: { maxTicksLimit: 8 },
+                        },
+                    },
+                },
             });
 
-            // Power Chart
-            const powerCtx = document.getElementById('powerChart').getContext('2d');
-            const powerChart = new Chart(powerCtx, {
-                type: 'line',
+            const waterChart = new Chart(document.getElementById('waterChart').getContext('2d'), {
+                type: 'bar',
                 data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Daya Solar (W)',
-                            data: @json($solarData),
-                            borderColor: '#0ea5e9',
-                            backgroundColor: 'rgba(14, 165, 233, 0.15)',
-                            fill: true,
-                            borderWidth: 2.5,
-                            tension: 0.4,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Baterai (%)',
-                            data: @json($batteryData),
-                            borderColor: '#1d4ed8',
-                            backgroundColor: 'rgba(29, 78, 216, 0.15)',
-                            fill: true,
-                            borderWidth: 2.5,
-                            tension: 0.4,
-                            yAxisID: 'y1'
-                        }
-                    ]
+                    labels: chartSlice(chartLabels, 24),
+                    datasets: [{
+                        label: 'Tinggi Air (cm)',
+                        data: chartSlice(waterLevelData, 24),
+                        borderColor: '#4338ca',
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                        borderWidth: 2,
+                        borderRadius: 5,
+                        maxBarThickness: 28,
+                    }],
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'Daya Solar (W)' },
-                            ticks: { color: '#0ea5e9' },
-                            grid: { color: 'rgba(148, 163, 184, 0.2)' }
+                        x: {
+                            ticks: { maxTicksLimit: 8 },
                         },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Baterai (%)' },
-                            ticks: { color: '#1d4ed8' },
-                            grid: { drawOnChartArea: false }
-                        }
-                    }
-                }
+                    },
+                },
             });
 
-            // MQTT over WSS (EMQX public broker)
-            const mqtt_broker = 'broker.emqx.io';
-            const mqtt_port = 8084;
-            const mqtt_topic_data = 'risetkebencanaan2026/alat1/data';
-            const mqttStatusEl = document.getElementById('relayMqttStatus');
-            const alat1RuntimeBadgeEl = document.getElementById('alat1RuntimeBadge');
-            const alat2RuntimeBadgeEl = document.getElementById('alat2RuntimeBadge');
-            const alat2StatusTextEl = document.getElementById('alat2StatusText');
-            const rainStatusBadgeEl = document.getElementById('rainStatusBadge');
-            const currentRainfallValueEl = document.getElementById('currentRainfallValue');
-            const jarakAirValueEl = document.getElementById('jarakAirValue');
-            const latestSolarValueEl = document.getElementById('latestSolarValue');
-            const latestBatteryValueEl = document.getElementById('latestBatteryValue');
-            const batteryLevelBarEl = document.getElementById('batteryLevelBar');
+            function redrawCharts() {
+                const rainLimit = asNumber(rainChartViewEl?.value, 24);
+                const waterLimit = asNumber(waterChartViewEl?.value, 24);
 
-            function toNumber(value) {
-                const parsed = Number(value);
-                return Number.isFinite(parsed) ? parsed : null;
+                rainChart.data.labels = chartSlice(chartLabels, rainLimit);
+                rainChart.data.datasets[0].data = chartSlice(rainfallData, rainLimit);
+                rainChart.update('none');
+
+                waterChart.data.labels = chartSlice(chartLabels, waterLimit);
+                waterChart.data.datasets[0].data = chartSlice(waterLevelData, waterLimit);
+                waterChart.update('none');
             }
 
-            function setRainStatusByRainfall(rainfall) {
-                if (!rainStatusBadgeEl || rainfall === null) {
-                    return;
-                }
+            rainChartViewEl?.addEventListener('change', redrawCharts);
+            waterChartViewEl?.addEventListener('change', redrawCharts);
 
-                const isRain = rainfall > 0;
-                rainStatusBadgeEl.textContent = `Status: ${isRain ? 'Rain' : 'No Rain'}`;
-                rainStatusBadgeEl.classList.remove('bg-cyan-100', 'text-cyan-800', 'bg-slate-100', 'text-slate-700');
-                if (isRain) {
-                    rainStatusBadgeEl.classList.add('bg-cyan-100', 'text-cyan-800');
-                } else {
-                    rainStatusBadgeEl.classList.add('bg-slate-100', 'text-slate-700');
-                }
-            }
-
-            function setRainStatusByText(status) {
-                if (!rainStatusBadgeEl) {
-                    return;
-                }
-
-                const isRain = String(status || '').toLowerCase() === 'rain';
-                rainStatusBadgeEl.textContent = `Status: ${isRain ? 'Rain' : 'No Rain'}`;
-                rainStatusBadgeEl.classList.remove('bg-cyan-100', 'text-cyan-800', 'bg-slate-100', 'text-slate-700');
-                if (isRain) {
-                    rainStatusBadgeEl.classList.add('bg-cyan-100', 'text-cyan-800');
-                } else {
-                    rainStatusBadgeEl.classList.add('bg-slate-100', 'text-slate-700');
-                }
-            }
-
-            function setBatteryMeter(value) {
-                if (!batteryLevelBarEl) {
-                    return;
-                }
-
-                const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
-                batteryLevelBarEl.style.width = `${safeValue}%`;
-                batteryLevelBarEl.classList.remove('bg-sky-500', 'bg-cyan-500', 'bg-blue-500', 'bg-red-500');
-
-                if (safeValue >= 75) {
-                    batteryLevelBarEl.classList.add('bg-sky-500');
-                } else if (safeValue >= 50) {
-                    batteryLevelBarEl.classList.add('bg-cyan-500');
-                } else if (safeValue >= 25) {
-                    batteryLevelBarEl.classList.add('bg-blue-500');
-                } else {
-                    batteryLevelBarEl.classList.add('bg-red-500');
-                }
-            }
-
-            function sanitizeSeries(values, fallbackLength) {
-                if (!Array.isArray(values)) {
-                    return Array(fallbackLength).fill(0);
-                }
-
-                return values.map((value) => {
-                    const parsed = Number(value);
-                    return Number.isFinite(parsed) ? parsed : 0;
-                });
-            }
-
-            function applyChartsFromDb(payload) {
-                if (!payload || !Array.isArray(payload.chartLabels)) {
-                    return;
-                }
-
-                const nextLabels = payload.chartLabels;
-                const pointsCount = nextLabels.length;
-
-                rainfallBarChart.data.labels = nextLabels;
-                rainfallBarChart.data.datasets[0].data = sanitizeSeries(payload.rainfallData, pointsCount);
-                rainfallBarChart.update('none');
-
-                waterLevelBarChart.data.labels = nextLabels;
-                waterLevelBarChart.data.datasets[0].data = sanitizeSeries(payload.waterLevelData, pointsCount);
-                waterLevelBarChart.update('none');
-
-                audioFrequencyChart.data.labels = nextLabels;
-                audioFrequencyChart.data.datasets[0].data = sanitizeSeries(payload.audioFrequencyData, pointsCount);
-                audioFrequencyChart.update('none');
-
-                powerChart.data.labels = nextLabels;
-                powerChart.data.datasets[0].data = sanitizeSeries(payload.solarData, pointsCount);
-                powerChart.data.datasets[1].data = sanitizeSeries(payload.batteryData, pointsCount);
-                powerChart.update('none');
-            }
-
-            async function refreshChartsFromDb() {
-                try {
-                    const response = await fetch(chartDataEndpoint, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json',
-                        },
-                    });
-
-                    if (!response.ok) {
-                        return;
-                    }
-
-                    const payload = await response.json();
-                    applyChartsFromDb(payload);
-                } catch (error) {
-                    console.error('Gagal refresh chart dari database:', error);
-                }
-            }
-
-            function applyDashboardLiveData(payload) {
-                if (!payload || typeof payload !== 'object') {
-                    return;
-                }
-
-                const rainfall = toNumber(payload.latest_rainfall_mm);
-                const waterLevel = toNumber(payload.latest_water_level_cm);
-                const battery = toNumber(payload.latest_battery_percent);
-                const solar = toNumber(payload.latest_solar_power_watts);
-
-                if (currentRainfallValueEl && rainfall !== null) {
-                    currentRainfallValueEl.textContent = rainfall.toFixed(1);
-                }
-
-                if (jarakAirValueEl && waterLevel !== null) {
-                    jarakAirValueEl.textContent = waterLevel.toFixed(1);
-                }
-
-                setRainStatusByText(payload.latest_rain_status);
-
-                if (alat1RuntimeBadgeEl && payload.alat1_runtime_status) {
-                    alat1RuntimeBadgeEl.textContent = payload.alat1_runtime_status;
-                }
-
-                if (alat2RuntimeBadgeEl && payload.alat2_runtime_status) {
-                    alat2RuntimeBadgeEl.textContent = payload.alat2_runtime_status;
-                }
-
-                if (alat2StatusTextEl && payload.alat2_status_text) {
-                    alat2StatusTextEl.textContent = payload.alat2_status_text;
-                }
-
-                if (latestBatteryValueEl && battery !== null) {
-                    latestBatteryValueEl.textContent = String(Math.round(battery));
-                    setBatteryMeter(battery);
-                }
-
-                if (latestSolarValueEl && solar !== null) {
-                    latestSolarValueEl.textContent = String(Math.round(solar));
-                }
-
-                if (payload.chart) {
-                    applyChartsFromDb(payload.chart);
-                }
-            }
-
-            async function refreshDashboardLive() {
+            async function refreshLiveFromBackend() {
                 try {
                     const response = await fetch(dashboardLiveEndpoint, {
                         headers: {
@@ -550,128 +443,138 @@
                     }
 
                     const payload = await response.json();
-                    applyDashboardLiveData(payload);
+                    updateStatusFields(payload);
+                    updateLastDataBadge(new Date());
+
+                    if (payload.chart && Array.isArray(payload.chart.chartLabels)) {
+                        chartLabels = payload.chart.chartLabels;
+                        rainfallData = payload.chart.rainfallData || [];
+                        waterLevelData = payload.chart.waterLevelData || [];
+                        redrawCharts();
+                    }
                 } catch (error) {
-                    console.error('Gagal refresh live dashboard:', error);
+                    console.error('Gagal refresh live data:', error);
                 }
             }
 
-            let chartRefreshDebounceTimer = null;
-            function scheduleChartRefresh(delay = 1300) {
-                if (chartRefreshDebounceTimer) {
-                    clearTimeout(chartRefreshDebounceTimer);
-                }
+            async function refreshChartsOnly() {
+                try {
+                    const response = await fetch(dashboardChartEndpoint, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                    });
 
-                chartRefreshDebounceTimer = setTimeout(() => {
-                    refreshDashboardLive();
-                }, delay);
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const payload = await response.json();
+                    if (!Array.isArray(payload.chartLabels)) {
+                        return;
+                    }
+
+                    chartLabels = payload.chartLabels;
+                    rainfallData = payload.rainfallData || [];
+                    waterLevelData = payload.waterLevelData || [];
+                    redrawCharts();
+                } catch (error) {
+                    console.error('Gagal refresh chart data:', error);
+                }
             }
 
-            refreshDashboardLive();
-            setInterval(() => {
-                refreshDashboardLive().catch(() => {});
-            }, 3000);
+            deviceConfigFormEl?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const formData = new FormData(deviceConfigFormEl);
 
-            function setAlat1Runtime(message) {
-                if (!alat1RuntimeBadgeEl) {
+                const payload = {
+                    sleep_minutes: asNumber(formData.get('sleep_minutes')),
+                    awake_minutes: asNumber(formData.get('awake_minutes')),
+                    rain_tip_threshold: asNumber(formData.get('rain_tip_threshold')),
+                    rain_stop_timeout_ms: asNumber(formData.get('rain_stop_timeout_ms')),
+                    wifi_warmup_ms: asNumber(formData.get('wifi_warmup_ms')),
+                    mm_per_tip: asNumber(formData.get('mm_per_tip')),
+                    baseline_cm: asNumber(formData.get('baseline_cm')),
+                    esp_mode: asNumber(formData.get('esp_mode')),
+                    force_rain: asNumber(formData.get('force_rain')) === 1,
+                };
+
+                configStatusEl.textContent = 'Menyimpan dan mengirim konfigurasi...';
+
+                try {
+                    const response = await fetch(dashboardConfigEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const result = await response.json();
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Gagal update konfigurasi.');
+                    }
+
+                    configStatusEl.textContent = `${result.message} (${new Date().toLocaleTimeString('id-ID')})`;
+                    refreshLiveFromBackend();
+                } catch (error) {
+                    configStatusEl.textContent = `Error: ${error.message}`;
+                }
+            });
+
+            function setupMqttRealtime() {
+                if (!window.mqtt) {
                     return;
                 }
 
-                alat1RuntimeBadgeEl.textContent = message;
-            }
+                const wsProtocol = mqttConfig.ws_protocol || 'wss';
+                const wsHost = mqttConfig.ws_host || 'broker.emqx.io';
+                const wsPort = mqttConfig.ws_port || 8084;
+                const wsPath = mqttConfig.ws_path || '/mqtt';
+                const dataTopic = mqttConfig.data_topic;
+                const statusTopic = mqttConfig.status_topic;
 
-            function setMqttStatus(message, connected = false) {
-                if (!mqttStatusEl) {
-                    return;
-                }
-
-                mqttStatusEl.textContent = message;
-                mqttStatusEl.classList.remove('bg-blue-100', 'text-blue-800', 'ring-blue-200', 'bg-emerald-100', 'text-emerald-800', 'ring-emerald-200', 'bg-amber-100', 'text-amber-800', 'ring-amber-200');
-                if (connected) {
-                    mqttStatusEl.classList.add('bg-emerald-100', 'text-emerald-800', 'ring-emerald-200');
-                } else {
-                    mqttStatusEl.classList.add('bg-amber-100', 'text-amber-800', 'ring-amber-200');
-                }
-            }
-
-            if (window.mqtt) {
-                const mqttClient = mqtt.connect(`wss://${mqtt_broker}:${mqtt_port}/mqtt`, {
-                    clientId: `monitoring_web_${Math.random().toString(16).slice(2, 10)}`,
+                const url = `${wsProtocol}://${wsHost}:${wsPort}${wsPath}`;
+                const client = mqtt.connect(url, {
+                    clientId: `web_iot_${Math.random().toString(16).slice(2, 10)}`,
                     clean: true,
-                    reconnectPeriod: 5000,
-                    connectTimeout: 30000,
+                    reconnectPeriod: 4000,
+                    connectTimeout: 20000,
                     keepalive: 60,
                 });
 
-                setMqttStatus('Menyambungkan MQTT...');
-
-                mqttClient.on('connect', () => {
-                    setMqttStatus('MQTT tersambung', true);
-                    setAlat1Runtime('ALAT 1: MQTT tersambung');
-
-                    mqttClient.subscribe(mqtt_topic_data, { qos: 0 }, (error) => {
+                client.on('connect', () => {
+                    client.subscribe([dataTopic, statusTopic], { qos: 0 }, (error) => {
                         if (error) {
-                            setMqttStatus('Subscribe topic gagal');
-                            setAlat1Runtime('ALAT 1: subscribe gagal');
-                            return;
+                            console.error('MQTT subscribe gagal:', error);
                         }
-
-                        setMqttStatus('MQTT aktif, menunggu data...', true);
-                        setAlat1Runtime('ALAT 1: menunggu data MQTT');
                     });
                 });
 
-                mqttClient.on('message', (topic, payloadBuffer) => {
-                    const payload = payloadBuffer.toString();
-                    const timestamp = new Date().toLocaleTimeString('id-ID');
-
-                    setMqttStatus(`Data diterima ${timestamp}`, true);
-
+                client.on('message', (topic, messageBuffer) => {
                     try {
-                        const data = JSON.parse(payload);
-                        const curahHujan = toNumber(data.curah_hujan_mm);
-                        const jarakAir = toNumber(data.jarak_air_cm);
+                        const payload = JSON.parse(messageBuffer.toString());
+                        updateStatusFields(payload);
+                        updateLastDataBadge(new Date());
+                        refreshChartsOnly();
 
-                        if (topic === mqtt_topic_data) {
-                            if (currentRainfallValueEl && curahHujan !== null) {
-                                currentRainfallValueEl.textContent = curahHujan.toFixed(1);
-                            }
-
-                            if (jarakAirValueEl && jarakAir !== null) {
-                                jarakAirValueEl.textContent = jarakAir.toFixed(2);
-                            }
-
-                            scheduleChartRefresh();
-
-                            setRainStatusByRainfall(curahHujan);
-                            setAlat1Runtime(`ALAT 1: data masuk ${timestamp}`);
-                        }
-
-                        console.log('MQTT message parsed:', topic, data);
-                    } catch {
-                        console.log('MQTT raw message:', topic, payload);
+                    } catch (error) {
+                        console.error('Payload MQTT tidak valid:', error);
                     }
                 });
 
-                mqttClient.on('reconnect', () => {
-                    setMqttStatus('Reconnect MQTT...');
-                    setAlat1Runtime('ALAT 1: reconnect MQTT...');
-                });
-
-                mqttClient.on('close', () => {
-                    setMqttStatus('Koneksi MQTT terputus');
-                    setAlat1Runtime('ALAT 1: koneksi terputus');
-                });
-
-                mqttClient.on('error', (error) => {
+                client.on('error', (error) => {
                     console.error('MQTT error:', error);
-                    setMqttStatus('MQTT error, cek koneksi');
-                    setAlat1Runtime('ALAT 1: MQTT error');
                 });
-            } else {
-                setMqttStatus('Library MQTT tidak termuat');
-                setAlat1Runtime('ALAT 1: library MQTT gagal dimuat');
             }
+
+            refreshLiveFromBackend();
+            setInterval(refreshLiveFromBackend, 3500);
+            setupMqttRealtime();
         </script>
     @endpush
 </x-layouts.app>
