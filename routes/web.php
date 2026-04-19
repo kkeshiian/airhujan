@@ -24,6 +24,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/live', [DashboardController::class, 'live'])->name('dashboard.live');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart-data');
+    Route::post('/dashboard/command', [DashboardController::class, 'sendCommand'])->name('dashboard.command');
+    Route::post('/dashboard/config', [DashboardController::class, 'updateDeviceConfig'])->name('dashboard.config');
     Route::post('/locations/{deviceCode}', [DashboardController::class, 'updateLocation'])
         ->middleware('admin')
         ->name('locations.update');

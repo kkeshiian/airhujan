@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\AudioRecord;
+use App\Models\DeviceSetting;
 use App\Models\SensorLog;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -23,6 +24,7 @@ class MqttSubscribeCommand extends Command
         {--password= : MQTT password}
         {--client-id= : MQTT client id}
         {--sensor-topic= : Sensor topic (alat 1)}
+        {--status-topic= : Status topic (alat 1)}
         {--audio-topic= : Audio topic (alat 2)}
         {--qos= : QoS level 0-2}';
 
@@ -35,11 +37,12 @@ class MqttSubscribeCommand extends Command
         $username = $this->option('username') ?: config('mqtt.username');
         $password = $this->option('password') ?: config('mqtt.password');
         $sensorTopic = (string) ($this->option('sensor-topic') ?: config('mqtt.sensor_topic'));
+        $statusTopic = (string) ($this->option('status-topic') ?: config('mqtt.status_topic'));
         $audioTopic = (string) ($this->option('audio-topic') ?: config('mqtt.audio_topic'));
         $qos = (int) ($this->option('qos') ?: config('mqtt.qos'));
         $clientId = (string) ($this->option('client-id') ?: config('mqtt.client_id_prefix').'_'.Str::random(8));
 
-        $topics = array_values(array_unique(array_filter([$sensorTopic, $audioTopic])));
+        $topics = array_values(array_unique(array_filter([$sensorTopic, $statusTopic, $audioTopic])));
         if (empty($topics)) {
             $this->error('Topic MQTT belum diatur. Isi MQTT_SENSOR_TOPIC atau MQTT_AUDIO_TOPIC.');
 
@@ -73,11 +76,11 @@ class MqttSubscribeCommand extends Command
             $this->info(sprintf('MQTT connected: %s:%d (clientId=%s)', $host, $port, $clientId));
 
             foreach ($topics as $topic) {
-                $mqtt->subscribe($topic, function (string $topic, string $message, bool $retained, array $matchedWildcards) use ($sensorTopic, $audioTopic): void {
+                $mqtt->subscribe($topic, function (string $topic, string $message, bool $retained, array $matchedWildcards) use ($sensorTopic, $statusTopic, $audioTopic): void {
                     $this->line(sprintf('MQTT message received: topic=%s retained=%s', $topic, $retained ? 'yes' : 'no'));
 
                     try {
-                        $this->processMessage($topic, $message, $sensorTopic, $audioTopic);
+                        $this->processMessage($topic, $message, $sensorTopic, $statusTopic, $audioTopic);
                     } catch (Throwable $e) {
                         $this->error('Failed processing MQTT payload: '.$e->getMessage());
                     }
@@ -104,7 +107,7 @@ class MqttSubscribeCommand extends Command
         return self::SUCCESS;
     }
 
-    private function processMessage(string $topic, string $message, string $sensorTopic, string $audioTopic): void
+    private function processMessage(string $topic, string $message, string $sensorTopic, string $statusTopic, string $audioTopic): void
     {
         $payload = json_decode($message, true);
 
@@ -116,13 +119,25 @@ class MqttSubscribeCommand extends Command
 
         $normalizedTopic = trim($topic);
         $normalizedSensorTopic = trim($sensorTopic);
+        $normalizedStatusTopic = trim($statusTopic);
         $normalizedAudioTopic = trim($audioTopic);
 
-        $isSensorPayload = array_key_exists('curah_hujan_mm', $payload) || array_key_exists('jarak_air_cm', $payload);
+        $isSensorPayload = array_key_exists('curah_hujan_mm', $payload)
+            || array_key_exists('daily_rain_mm', $payload)
+            || array_key_exists('jarak_air_cm', $payload)
+            || array_key_exists('kenaikan_air_cm', $payload);
+        $isStatusPayload = array_key_exists('is_raining', $payload)
+            && (array_key_exists('esp_mode', $payload) || array_key_exists('time_synced', $payload));
         $isAudioPayload = array_key_exists('file_path', $payload) || array_key_exists('duration_seconds', $payload) || array_key_exists('durasi_detik', $payload);
 
         if ($normalizedTopic === $normalizedSensorTopic || str_ends_with($normalizedTopic, '/alat1/data') || $isSensorPayload) {
             $this->storeSensorPayload($payload);
+
+            return;
+        }
+
+        if ($normalizedTopic === $normalizedStatusTopic || str_ends_with($normalizedTopic, '/alat1/status') || $isStatusPayload) {
+            $this->storeStatusPayload($payload);
 
             return;
         }
@@ -141,16 +156,23 @@ class MqttSubscribeCommand extends Command
 
         if (str_contains($normalizedTopic, '/data')) {
             $this->storeSensorPayload($payload);
+
+            return;
+        }
+
+        if (str_contains($normalizedTopic, '/status')) {
+            $this->storeStatusPayload($payload);
         }
     }
 
     private function storeSensorPayload(array $payload): void
     {
-        $rainfall = $this->toFloat($payload['curah_hujan_mm'] ?? null);
+        $rainfall = $this->toFloat($payload['daily_rain_mm'] ?? $payload['curah_hujan_mm'] ?? null);
         $distance = $this->toFloat($payload['jarak_air_cm'] ?? null);
+        $waterRise = $this->toFloat($payload['kenaikan_air_cm'] ?? null);
 
-        if ($rainfall === null && $distance === null) {
-            $this->warn('Payload sensor tidak punya curah_hujan_mm/jarak_air_cm, diabaikan.');
+        if ($rainfall === null && $distance === null && $waterRise === null) {
+            $this->warn('Payload sensor tidak punya daily_rain_mm/jarak_air_cm/kenaikan_air_cm, diabaikan.');
 
             return;
         }
@@ -161,7 +183,22 @@ class MqttSubscribeCommand extends Command
             'device_code' => (string) ($payload['device_code'] ?? 'alat_1'),
             'rainfall_mm' => $rainfall,
             'water_level_cm' => $distance,
-            'rain_status' => ($rainfall ?? 0.0) > 0 ? 'Rain' : 'No Rain',
+            'water_rise_cm' => $waterRise,
+            'daily_tip_count' => $this->toInt($payload['daily_tip_count'] ?? null),
+            'is_raining' => $this->toBool($payload['is_raining'] ?? null),
+            'force_rain' => $this->toBool($payload['force_rain'] ?? null),
+            'esp_mode' => $this->toInt($payload['esp_mode'] ?? null),
+            'esp_mode_name' => $this->toStringOrNull($payload['esp_mode_name'] ?? null),
+            'sleep_minutes' => $this->toInt($payload['sleep_minutes'] ?? null),
+            'awake_minutes' => $this->toInt($payload['awake_minutes'] ?? null),
+            'rain_tip_threshold' => $this->toInt($payload['rain_tip_threshold'] ?? null),
+            'rain_stop_timeout_ms' => $this->toInt($payload['rain_stop_timeout_ms'] ?? null),
+            'wifi_warmup_ms' => $this->toInt($payload['wifi_warmup_ms'] ?? null),
+            'mm_per_tip' => $this->toFloat($payload['mm_per_tip'] ?? null),
+            'baseline_cm' => $this->toFloat($payload['baseline_cm'] ?? null),
+            'day_key' => $this->toInt($payload['day_key'] ?? null),
+            'time_synced' => $this->toBool($payload['time_synced'] ?? null),
+            'rain_status' => $this->resolveRainStatus($payload),
             'battery_percent' => $this->toInt($payload['battery_percent'] ?? null),
             'solar_power_watts' => $this->toInt($payload['solar_power_watts'] ?? null),
             'device_status' => (string) ($payload['device_status'] ?? 'online via mqtt'),
@@ -176,6 +213,40 @@ class MqttSubscribeCommand extends Command
             (float) ($rainfall ?? 0.0),
             (float) ($distance ?? 0.0)
         ));
+
+        $this->syncDeviceSettingFromPayload($payload);
+    }
+
+    private function storeStatusPayload(array $payload): void
+    {
+        $recordedAt = $this->resolveRecordedAt($payload['recorded_at'] ?? $payload['timestamp'] ?? null);
+
+        $data = [
+            'device_code' => (string) ($payload['device_code'] ?? 'alat_1'),
+            'rainfall_mm' => $this->toFloat($payload['daily_rain_mm'] ?? null),
+            'daily_tip_count' => $this->toInt($payload['daily_tip_count'] ?? null),
+            'is_raining' => $this->toBool($payload['is_raining'] ?? null),
+            'force_rain' => $this->toBool($payload['force_rain'] ?? null),
+            'esp_mode' => $this->toInt($payload['esp_mode'] ?? null),
+            'esp_mode_name' => $this->toStringOrNull($payload['esp_mode_name'] ?? null),
+            'sleep_minutes' => $this->toInt($payload['sleep_minutes'] ?? null),
+            'awake_minutes' => $this->toInt($payload['awake_minutes'] ?? null),
+            'rain_tip_threshold' => $this->toInt($payload['rain_tip_threshold'] ?? null),
+            'rain_stop_timeout_ms' => $this->toInt($payload['rain_stop_timeout_ms'] ?? null),
+            'wifi_warmup_ms' => $this->toInt($payload['wifi_warmup_ms'] ?? null),
+            'mm_per_tip' => $this->toFloat($payload['mm_per_tip'] ?? null),
+            'day_key' => $this->toInt($payload['day_key'] ?? null),
+            'time_synced' => $this->toBool($payload['time_synced'] ?? null),
+            'rain_status' => $this->resolveRainStatus($payload),
+            'device_status' => (string) ($payload['device_status'] ?? 'status via mqtt'),
+            'recorded_at' => $recordedAt,
+        ];
+
+        $log = $this->createSensorLogWithRetry($this->filterFillableTableColumns('sensor_logs', $data));
+
+        $this->info(sprintf('Status saved: #%d mode=%s rain=%s', $log->id, (string) ($payload['esp_mode_name'] ?? 'unknown'), $this->resolveRainStatus($payload)));
+
+        $this->syncDeviceSettingFromPayload($payload);
     }
 
     private function storeAudioPayload(array $payload): void
@@ -237,6 +308,90 @@ class MqttSubscribeCommand extends Command
         }
 
         return (int) $value;
+    }
+
+    private function toBool(mixed $value): ?bool
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+
+            if (in_array($normalized, ['true', 'yes', 'on', '1'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['false', 'no', 'off', '0'], true)) {
+                return false;
+            }
+        }
+
+        return null;
+    }
+
+    private function toStringOrNull(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $text = trim((string) $value);
+
+        return $text === '' ? null : $text;
+    }
+
+    private function resolveRainStatus(array $payload): string
+    {
+        $isRaining = $this->toBool($payload['is_raining'] ?? null);
+
+        if ($isRaining !== null) {
+            return $isRaining ? 'Rain' : 'No Rain';
+        }
+
+        $rainfall = $this->toFloat($payload['daily_rain_mm'] ?? $payload['curah_hujan_mm'] ?? null);
+
+        return ($rainfall ?? 0.0) > 0 ? 'Rain' : 'No Rain';
+    }
+
+    private function syncDeviceSettingFromPayload(array $payload): void
+    {
+        $settingData = [
+            'sleep_minutes' => $this->toInt($payload['sleep_minutes'] ?? null),
+            'awake_minutes' => $this->toInt($payload['awake_minutes'] ?? null),
+            'rain_tip_threshold' => $this->toInt($payload['rain_tip_threshold'] ?? null),
+            'rain_stop_timeout_ms' => $this->toInt($payload['rain_stop_timeout_ms'] ?? null),
+            'wifi_warmup_ms' => $this->toInt($payload['wifi_warmup_ms'] ?? null),
+            'mm_per_tip' => $this->toFloat($payload['mm_per_tip'] ?? null),
+            'baseline_cm' => $this->toFloat($payload['baseline_cm'] ?? null),
+            'esp_mode' => $this->toInt($payload['esp_mode'] ?? null),
+            'force_rain' => $this->toBool($payload['force_rain'] ?? null),
+            'last_published_at' => now(),
+        ];
+
+        $filteredData = array_filter(
+            $this->filterFillableTableColumns('device_settings', $settingData),
+            static fn (mixed $value): bool => $value !== null
+        );
+
+        if ($filteredData === []) {
+            return;
+        }
+
+        $setting = DeviceSetting::query()->firstOrCreate([], [
+            'deep_sleep_seconds' => 300,
+        ]);
+
+        $setting->update($filteredData);
     }
 
     private function createSensorLogWithRetry(array $data): SensorLog
