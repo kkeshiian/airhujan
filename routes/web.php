@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AudioController;
+use App\Http\Controllers\AdminSimulatorController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataExportController;
@@ -41,6 +42,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/exports/sensor-csv', [DataExportController::class, 'sensorCsv'])->name('exports.sensor.csv');
 
     Route::middleware('admin')->group(function (): void {
+        Route::get('/admin/simulator', [AdminSimulatorController::class, 'index'])->name('simulator.index');
+        Route::post('/admin/simulator/sensor', [AdminSimulatorController::class, 'storeSensor'])->name('simulator.sensor.store');
+        Route::post('/admin/simulator/audio', [AdminSimulatorController::class, 'storeAudio'])->name('simulator.audio.store');
+        Route::put('/admin/simulator/auto-generator', [AdminSimulatorController::class, 'updateAutoGenerator'])->name('simulator.auto.update');
+
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::put('/settings/locations', [SettingsController::class, 'updateLocations'])->name('settings.locations.update');
