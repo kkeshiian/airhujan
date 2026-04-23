@@ -183,9 +183,9 @@
     @push('scripts')
         <script>
             const mqttConfig = @json($mqtt);
-            const dashboardLiveEndpoint = @json(route('dashboard.live'));
-            const dashboardChartEndpoint = @json(route('dashboard.chart-data'));
-            const dashboardConfigEndpoint = @json(route('dashboard.config'));
+            const dashboardLiveEndpoint = @json(route('dashboard.live', [], false));
+            const dashboardChartEndpoint = @json(route('dashboard.chart-data', [], false));
+            const dashboardConfigEndpoint = @json(route('dashboard.config', [], false));
             const csrfToken = @json(csrf_token());
 
             const rainStatusDotEl = document.getElementById('rainStatusDot');
