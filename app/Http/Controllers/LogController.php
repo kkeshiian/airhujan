@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SensorLog;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -11,6 +12,8 @@ use Illuminate\View\View;
 
 class LogController extends Controller
 {
+    private const SIMULATOR_TIMEZONE = 'Asia/Makassar';
+
     public function index(Request $request): View
     {
         $sort = $request->string('sort')->toString();
@@ -79,11 +82,19 @@ class LogController extends Controller
         }
 
         if ($request->filled('start_date')) {
-            $query->whereDate('recorded_at', '>=', $request->string('start_date'));
+            $startDate = Carbon::createFromFormat('Y-m-d', $request->string('start_date')->toString(), self::SIMULATOR_TIMEZONE)
+                ->startOfDay()
+                ->setTimezone('UTC');
+
+            $query->where('recorded_at', '>=', $startDate);
         }
 
         if ($request->filled('end_date')) {
-            $query->whereDate('recorded_at', '<=', $request->string('end_date'));
+            $endDate = Carbon::createFromFormat('Y-m-d', $request->string('end_date')->toString(), self::SIMULATOR_TIMEZONE)
+                ->endOfDay()
+                ->setTimezone('UTC');
+
+            $query->where('recorded_at', '<=', $endDate);
         }
 
         return $query;
