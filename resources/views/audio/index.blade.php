@@ -18,6 +18,9 @@
                             $formattedTitle = $record->recorded_at
                                 ? 'hujan-'.$record->recorded_at->format('HisdmY')
                                 : ($record->title ?? '-');
+                            $audioMimeType = str_ends_with(strtolower((string) $record->file_path), '.wav')
+                                ? 'audio/wav'
+                                : 'audio/mpeg';
                         @endphp
                         <tr class="border-t border-slate-100 align-top">
                             <td class="px-3 py-2">{{ $record->recorded_at?->copy()->addHours(8)->format('Y-m-d H:i:s') ?? '-' }}</td>
@@ -26,7 +29,7 @@
                             <td class="px-3 py-2">{{ $record->duration_seconds ?? '-' }} detik</td>
                             <td class="px-3 py-2 min-w-[280px]">
                                 <audio controls class="w-full max-w-md">
-                                    <source src="{{ asset('storage/'.$record->file_path) }}" type="audio/mpeg">
+                                    <source src="{{ asset('storage/'.$record->file_path) }}" type="{{ $audioMimeType }}">
                                 </audio>
                             </td>
                             <td class="px-3 py-2">

@@ -48,6 +48,7 @@
                 <a href="{{ route('logs.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('logs.*') ? 'bg-white/20 font-semibold text-aqua' : 'hover:bg-white/10' }}">Log Data</a>
                 <a href="{{ route('audio.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('audio.*') ? 'bg-white/20 font-semibold text-aqua' : 'hover:bg-white/10' }}">Audio</a>
                 @if(auth()->user()?->isAdmin())
+                    <a href="{{ route('simulator.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('simulator.*') ? 'bg-white/20 font-semibold text-aqua' : 'hover:bg-white/10' }}">Simulator MQTT</a>
                     <a href="{{ route('settings.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('settings.*') ? 'bg-white/20 font-semibold text-aqua' : 'hover:bg-white/10' }}">Settings</a>
                     <a href="{{ route('users.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('users.*') ? 'bg-white/20 font-semibold text-aqua' : 'hover:bg-white/10' }}">Manajemen Akun</a>
                 @endif
@@ -109,6 +110,7 @@
                     <a href="{{ route('logs.index') }}" class="mobile-menu-link block rounded-lg px-3 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-700 {{ request()->routeIs('logs.*') ? 'bg-sky-100 font-semibold text-sky-700' : '' }}">Log Data</a>
                     <a href="{{ route('audio.index') }}" class="mobile-menu-link block rounded-lg px-3 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-700 {{ request()->routeIs('audio.*') ? 'bg-sky-100 font-semibold text-sky-700' : '' }}">Audio</a>
                     @if(auth()->user()?->isAdmin())
+                        <a href="{{ route('simulator.index') }}" class="mobile-menu-link block rounded-lg px-3 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-700 {{ request()->routeIs('simulator.*') ? 'bg-sky-100 font-semibold text-sky-700' : '' }}">Simulator MQTT</a>
                         <a href="{{ route('settings.index') }}" class="mobile-menu-link block rounded-lg px-3 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-700 {{ request()->routeIs('settings.*') ? 'bg-sky-100 font-semibold text-sky-700' : '' }}">Settings</a>
                         <a href="{{ route('users.index') }}" class="mobile-menu-link block rounded-lg px-3 py-2.5 text-slate-700 hover:bg-sky-50 hover:text-sky-700 {{ request()->routeIs('users.*') ? 'bg-sky-100 font-semibold text-sky-700' : '' }}">Manajemen Akun</a>
                     @endif
