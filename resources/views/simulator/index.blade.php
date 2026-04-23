@@ -34,13 +34,39 @@
                 <input id="autoDistanceInput" type="number" min="0" max="5000" step="0.01" name="sim_ultrasonic_distance_cm" value="{{ old('sim_ultrasonic_distance_cm', number_format((float) ($autoConfig['ultrasonic_distance_cm'] ?? 0), 2, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
             </label>
 
-            <div class="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Target Malam (Pasang) (cm)</span>
+                <input id="autoNightTargetInput" type="number" min="0" max="5000" step="0.01" name="sim_night_target_cm" value="{{ old('sim_night_target_cm', number_format((float) ($autoConfig['night_target_cm'] ?? 120), 2, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Target Siang (Surut) (cm)</span>
+                <input id="autoNoonTargetInput" type="number" min="0" max="5000" step="0.01" name="sim_noon_peak_target_cm" value="{{ old('sim_noon_peak_target_cm', number_format((float) ($autoConfig['noon_peak_target_cm'] ?? 95), 2, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Laju Naik per Interval (cm)</span>
+                <input id="autoNightRiseInput" type="number" min="0.01" max="100" step="0.001" name="sim_night_rise_cm" value="{{ old('sim_night_rise_cm', number_format((float) ($autoConfig['night_rise_cm'] ?? 0.25), 3, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+            </label>
+
+            <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Laju Turun per Interval (cm)</span>
+                <input id="autoDayDropInput" type="number" min="0.01" max="100" step="0.001" name="sim_day_drop_cm" value="{{ old('sim_day_drop_cm', number_format((float) ($autoConfig['day_drop_cm'] ?? 0.20), 3, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+            </label>
+
+            <div class="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200 md:col-span-2 xl:col-span-2">
                 <p class="text-xs text-slate-500">Terakhir Auto Insert</p>
                 <p class="mt-1 text-sm font-semibold text-slate-900">
                     {{ ($autoConfig['last_generated_at'] ?? null)?->format('Y-m-d H:i:s') ?? '-' }}
                 </p>
-                <p class="mt-2 text-xs text-slate-500">Rumus ketinggian: max(0, kedalaman air - jarak permukaan ke sensor).</p>
-                <p class="mt-2 text-sm font-semibold text-indigo-700">Preview: <span id="autoWaterLevelPreview">0.00</span> cm</p>
+                <p class="mt-2 text-xs text-slate-500">Mode target: malam menuju target pasang, pagi-siang menuju target surut, sore kembali ke target pasang. Boost hujan dihitung otomatis dari tip baru.</p>
+                <div class="mt-2 grid gap-2 text-sm md:grid-cols-2">
+                    <p class="font-semibold text-slate-700">Level Saat Ini (Log Terakhir): <span id="autoCurrentLevelPreview">0.00</span> cm</p>
+                    <p class="font-semibold text-indigo-700">Target Saat Ini: <span id="autoCurrentTargetPreview">0.00</span> cm</p>
+                    <p class="font-semibold text-cyan-700">Boost Tip/Hujan: <span id="autoRainBoostPreview">0.00</span> cm</p>
+                    <p class="font-semibold text-emerald-700">Air Menuju: <span id="autoTowardsPreview">0.00</span> cm</p>
+                    <p class="font-semibold text-slate-700">Prediksi 1 Interval: <span id="autoNextLevelPreview">0.00</span> cm</p>
+                </div>
             </div>
 
             <div class="flex items-end">
@@ -92,8 +118,13 @@
             </label>
 
             <label class="block text-sm">
+                <span class="mb-1 block text-xs font-medium text-slate-600">Ketinggian Air Manual (cm)</span>
+                <input id="manualWaterLevelInput" type="number" min="0" max="5000" step="0.01" name="water_level_cm" value="{{ old('water_level_cm', number_format((float) $defaultManualWaterLevel, 2, '.', '')) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+            </label>
+
+            <label class="block text-sm">
                 <span class="mb-1 block text-xs font-medium text-slate-600">Waktu Data (custom)</span>
-                <input type="datetime-local" name="recorded_at" value="{{ old('recorded_at', $defaultTipRecordedAt) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+                <input type="datetime-local" step="1" name="recorded_at" value="{{ old('recorded_at', $defaultTipRecordedAt) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
             </label>
 
             <input id="tipDeltaInput" type="hidden" name="tip_delta" value="{{ old('tip_delta', 0) }}">
@@ -102,6 +133,8 @@
             <div class="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
                 <p class="text-xs text-slate-500">Preview Curah Hujan</p>
                 <p class="mt-1 text-lg font-semibold text-cyan-700"><span id="rainfallPreview">0.00</span> mm</p>
+                <p class="mt-3 text-xs text-slate-500">Ketinggian Air yang Disimpan</p>
+                <p class="mt-1 text-lg font-semibold text-emerald-700"><span id="manualWaterLevelPreview">0.00</span> cm</p>
                 <p class="mt-3 text-xs text-slate-500">Tip harian dihitung per tanggal input.</p>
             </div>
 
@@ -137,7 +170,7 @@
 
             <label class="block text-sm">
                 <span class="mb-1 block text-xs font-medium text-slate-600">Waktu Data (custom)</span>
-                <input type="datetime-local" name="recorded_at" value="{{ old('recorded_at', $defaultRecordedAt) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
+                <input type="datetime-local" step="1" name="recorded_at" value="{{ old('recorded_at', $defaultRecordedAt) }}" class="w-full rounded-xl border border-slate-300 px-3 py-2" required>
             </label>
 
             <input type="hidden" name="device_code" value="alat_2">
@@ -153,9 +186,18 @@
             (function () {
                 const mmPerTip = {{ json_encode((float) $mmPerTip) }};
                 const baseDailyTip = {{ json_encode((int) $currentDailyTip) }};
+                const latestWaterLevel = {{ json_encode((float) $latestWaterLevel) }};
                 const autoDepthInput = document.getElementById('autoDepthInput');
                 const autoDistanceInput = document.getElementById('autoDistanceInput');
-                const autoWaterLevelPreview = document.getElementById('autoWaterLevelPreview');
+                const autoNightTargetInput = document.getElementById('autoNightTargetInput');
+                const autoNoonTargetInput = document.getElementById('autoNoonTargetInput');
+                const autoNightRiseInput = document.getElementById('autoNightRiseInput');
+                const autoDayDropInput = document.getElementById('autoDayDropInput');
+                const autoCurrentLevelPreview = document.getElementById('autoCurrentLevelPreview');
+                const autoCurrentTargetPreview = document.getElementById('autoCurrentTargetPreview');
+                const autoRainBoostPreview = document.getElementById('autoRainBoostPreview');
+                const autoTowardsPreview = document.getElementById('autoTowardsPreview');
+                const autoNextLevelPreview = document.getElementById('autoNextLevelPreview');
                 const tipDeltaInput = document.getElementById('tipDeltaInput');
                 const tipMinusButton = document.getElementById('tipMinusButton');
                 const tipPlusButton = document.getElementById('tipPlusButton');
@@ -163,10 +205,26 @@
                 const nextDailyTipPreview = document.getElementById('nextDailyTipPreview');
                 const baseDailyTipEl = document.getElementById('baseDailyTip');
                 const rainfallPreview = document.getElementById('rainfallPreview');
+                const manualWaterLevelInput = document.getElementById('manualWaterLevelInput');
+                const manualWaterLevelPreview = document.getElementById('manualWaterLevelPreview');
                 const recordedAtInput = document.querySelector('input[name="recorded_at"]');
 
-                if (!tipDeltaInput || !tipMinusButton || !tipPlusButton || !tipDeltaPreview || !nextDailyTipPreview || !baseDailyTipEl || !rainfallPreview || !recordedAtInput || !autoDepthInput || !autoDistanceInput || !autoWaterLevelPreview) {
+                if (!tipDeltaInput || !tipMinusButton || !tipPlusButton || !tipDeltaPreview || !nextDailyTipPreview || !baseDailyTipEl || !rainfallPreview || !manualWaterLevelInput || !manualWaterLevelPreview || !recordedAtInput || !autoDepthInput || !autoDistanceInput || !autoNightTargetInput || !autoNoonTargetInput || !autoNightRiseInput || !autoDayDropInput || !autoCurrentLevelPreview || !autoCurrentTargetPreview || !autoRainBoostPreview || !autoTowardsPreview || !autoNextLevelPreview) {
                     return;
+                }
+
+                function resolveAutoBaseTarget(hourFraction, nightTarget, noonTarget) {
+                    if (hourFraction >= 18 || hourFraction < 5) {
+                        return nightTarget;
+                    }
+
+                    if (hourFraction < 12) {
+                        const progress = (hourFraction - 5) / 7;
+                        return nightTarget + ((noonTarget - nightTarget) * progress);
+                    }
+
+                    const progress = (hourFraction - 12) / 6;
+                    return noonTarget + ((nightTarget - noonTarget) * progress);
                 }
 
                 function asNumber(value, fallback = 0) {
@@ -174,7 +232,23 @@
                     return Number.isFinite(parsed) ? parsed : fallback;
                 }
 
-                function refreshPreview() {
+                function resolveRainBoostCm(rainfallIncreaseMm) {
+                    if (rainfallIncreaseMm <= 0) {
+                        return 0;
+                    }
+
+                    if (rainfallIncreaseMm <= 2) {
+                        return rainfallIncreaseMm * 0.10;
+                    }
+
+                    if (rainfallIncreaseMm <= 10) {
+                        return (2 * 0.10) + ((rainfallIncreaseMm - 2) * 0.16);
+                    }
+
+                    return (2 * 0.10) + (8 * 0.16) + ((rainfallIncreaseMm - 10) * 0.22);
+                }
+
+                function resolveTipProjection() {
                     const delta = asNumber(tipDeltaInput.value, 0);
                     const selectedDate = new Date(recordedAtInput.value);
                     const now = new Date();
@@ -184,33 +258,75 @@
                         && selectedDate.getDate() === now.getDate();
                     const dailyBase = isSameDay ? baseDailyTip : 0;
                     const nextDailyTip = Math.max(0, dailyBase + delta);
-
+                    const newTipCount = Math.max(0, nextDailyTip - dailyBase);
                     const rainfall = nextDailyTip * mmPerTip;
 
-                    baseDailyTipEl.textContent = String(dailyBase);
-                    tipDeltaPreview.textContent = String(delta);
-                    nextDailyTipPreview.textContent = String(nextDailyTip);
-                    rainfallPreview.textContent = rainfall.toFixed(2);
+                    return {
+                        delta,
+                        dailyBase,
+                        nextDailyTip,
+                        rainfall,
+                        rainfallIncreaseMm: newTipCount * mmPerTip,
+                    };
+                }
+
+                function refreshPreview() {
+                    const projection = resolveTipProjection();
+
+                    baseDailyTipEl.textContent = String(projection.dailyBase);
+                    tipDeltaPreview.textContent = String(projection.delta);
+                    nextDailyTipPreview.textContent = String(projection.nextDailyTip);
+                    rainfallPreview.textContent = projection.rainfall.toFixed(2);
+                    manualWaterLevelPreview.textContent = asNumber(manualWaterLevelInput.value, 0).toFixed(2);
                 }
 
                 function refreshAutoPreview() {
                     const depth = Math.max(0, asNumber(autoDepthInput.value, 0));
                     const distance = Math.max(0, asNumber(autoDistanceInput.value, 0));
-                    const waterLevel = Math.max(0, depth - distance);
+                    const nightTarget = Math.max(0, asNumber(autoNightTargetInput.value, 0));
+                    const noonTarget = Math.max(0, asNumber(autoNoonTargetInput.value, 0));
+                    const riseStep = Math.max(0.01, asNumber(autoNightRiseInput.value, 0.25));
+                    const dropStep = Math.max(0.01, asNumber(autoDayDropInput.value, 0.2));
+                    const fallbackLevel = Math.max(0, depth - distance);
+                    const currentLevel = Math.max(0, asNumber(latestWaterLevel, fallbackLevel));
+                    const projection = resolveTipProjection();
 
-                    autoWaterLevelPreview.textContent = waterLevel.toFixed(2);
+                    const now = new Date();
+                    const hourFraction = now.getHours() + (now.getMinutes() / 60);
+                    const baseTarget = resolveAutoBaseTarget(hourFraction, nightTarget, noonTarget);
+                    const rainBoost = resolveRainBoostCm(projection.rainfallIncreaseMm);
+                    const effectiveTarget = Math.min(depth, Math.max(0, baseTarget + rainBoost));
+
+                    let nextLevel = currentLevel;
+                    if (effectiveTarget >= currentLevel) {
+                        nextLevel = Math.min(effectiveTarget, currentLevel + riseStep);
+                    } else {
+                        nextLevel = Math.max(effectiveTarget, currentLevel - dropStep);
+                    }
+
+                    autoCurrentLevelPreview.textContent = currentLevel.toFixed(2);
+                    autoCurrentTargetPreview.textContent = baseTarget.toFixed(2);
+                    autoRainBoostPreview.textContent = rainBoost.toFixed(2);
+                    autoTowardsPreview.textContent = effectiveTarget.toFixed(2);
+                    autoNextLevelPreview.textContent = nextLevel.toFixed(2);
                 }
 
                 function addDelta(step) {
                     const current = asNumber(tipDeltaInput.value, 0);
                     tipDeltaInput.value = String(current + step);
                     refreshPreview();
+                    refreshAutoPreview();
                 }
 
                 ['input', 'change'].forEach((eventName) => {
                     recordedAtInput.addEventListener(eventName, refreshPreview);
+                    manualWaterLevelInput.addEventListener(eventName, refreshPreview);
                     autoDepthInput.addEventListener(eventName, refreshAutoPreview);
                     autoDistanceInput.addEventListener(eventName, refreshAutoPreview);
+                    autoNightTargetInput.addEventListener(eventName, refreshAutoPreview);
+                    autoNoonTargetInput.addEventListener(eventName, refreshAutoPreview);
+                    autoNightRiseInput.addEventListener(eventName, refreshAutoPreview);
+                    autoDayDropInput.addEventListener(eventName, refreshAutoPreview);
                 });
 
                 tipPlusButton.addEventListener('click', function () {
